@@ -1,0 +1,536 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>서비스 이용 월별 비교</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --navy:       #1E3A5F;
+      --navy-mid:   #2E5F9E;
+      --blue:       #3A6EA5;
+      --blue-light: #5B8EC4;
+      --border:     #C8DCF0;
+      --bg-page:    #EDF3FA;
+      --bg-card:    #FFFFFF;
+      --bg-row:     #F4F8FD;
+      --bg-thead:   #EAF2FB;
+      --text-main:  #1E3A5F;
+      --text-sub:   #5A85B0;
+      --text-muted: #8AAAC8;
+      --green:      #2E7D32;
+      --green-bg:   #E6F4EA;
+      --red:        #C62828;
+      --red-bg:     #FDECEA;
+      --amber:      #B45309;
+      --amber-bg:   #FEF3C7;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      font-size: 13px;
+      color: var(--text-main);
+      background: var(--bg-page);
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: var(--navy);
+      padding: 0 28px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      border-bottom: 2px solid var(--navy-mid);
+    }
+    .header-logo {
+      width: 32px; height: 32px;
+      background: var(--navy-mid);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      color: #A8C8F0; font-size: 17px;
+    }
+    .header-logo svg { width: 18px; height: 18px; fill: none; stroke: #A8C8F0; stroke-width: 1.8; }
+    header h1 { font-size: 15px; font-weight: 700; color: #E8F1FB; letter-spacing: -0.2px; }
+    header p  { font-size: 11px; color: #7AAED6; margin-top: 2px; }
+
+    /* ── MAIN ── */
+    main { padding: 22px 28px 40px; display: flex; flex-direction: column; gap: 18px; }
+
+    /* ── UPLOAD ── */
+    .upload-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .upload-card {
+      background: var(--bg-card);
+      border: 1.5px dashed var(--border);
+      border-radius: 12px;
+      padding: 22px 18px;
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+    }
+    .upload-card:hover { border-color: var(--blue); background: #F4F8FD; }
+    .upload-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      background: var(--bg-thead);
+      display: flex; align-items: center; justify-content: center;
+      color: var(--blue); font-size: 20px;
+    }
+    .upload-card strong { font-size: 13px; font-weight: 700; color: var(--text-main); }
+    .upload-card .status { font-size: 11px; color: var(--text-muted); }
+    .badge-ok {
+      font-size: 10px; padding: 3px 10px; border-radius: 99px;
+      background: var(--green-bg); color: var(--green); font-weight: 700;
+    }
+    .upload-note { font-size: 11px; color: var(--text-sub); text-align: center; }
+
+    /* ── TOOLBAR ── */
+    .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .btn-primary {
+      height: 36px; padding: 0 18px; border-radius: 99px;
+      background: var(--navy); color: #E8F1FB;
+      border: none; font-size: 13px; font-weight: 700;
+      cursor: pointer; display: flex; align-items: center; gap: 6px;
+      transition: background .2s, transform .1s;
+    }
+    .btn-primary:hover  { background: var(--blue); }
+    .btn-primary:active { transform: scale(.97); }
+    .btn-primary:disabled { background: #9BAFC6; cursor: not-allowed; }
+    .btn-secondary {
+      height: 36px; padding: 0 16px; border-radius: 99px;
+      background: var(--bg-card); color: var(--blue);
+      border: 1px solid var(--border); font-size: 12px; font-weight: 500;
+      cursor: pointer; transition: background .2s;
+    }
+    .btn-secondary:hover { background: var(--bg-thead); }
+    .btn-reset {
+      height: 36px; padding: 0 14px; border-radius: 99px;
+      background: transparent; color: var(--text-muted);
+      border: 1px solid var(--border); font-size: 12px;
+      cursor: pointer; transition: background .2s;
+    }
+    .btn-reset:hover { background: var(--bg-card); }
+    .toolbar-note { font-size: 11px; color: var(--text-sub); }
+
+    /* ── STAT CARDS ── */
+    .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .stat-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-top: 3px solid var(--blue);
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .stat-card .s-label { font-size: 11px; color: var(--text-sub); margin-bottom: 4px; }
+    .stat-card .s-num   { font-size: 24px; font-weight: 700; color: var(--navy); line-height: 1; }
+    .stat-card .s-tag   { font-size: 10px; margin-top: 5px; }
+    .s-tag.up { color: var(--green); }
+    .s-tag.dn { color: var(--red); }
+    .s-tag.nt { color: var(--text-muted); }
+
+    /* ── PANEL SYSTEM ── */
+    .panel-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .panel {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .panel.full { grid-column: 1 / -1; }
+    .panel-head {
+      padding: 13px 16px 10px;
+      background: var(--navy);
+      display: flex; align-items: center; gap: 7px;
+      font-size: 12px; font-weight: 700; color: #E8F1FB;
+    }
+    .panel-head svg { width: 15px; height: 15px; fill: none; stroke: #A8C8F0; stroke-width: 1.8; flex-shrink: 0; }
+
+    /* ── TABLE ── */
+    .table-wrap { overflow: auto; max-height: 420px; }
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      position: sticky; top: 0; z-index: 5;
+      background: var(--bg-thead);
+      padding: 9px 12px; text-align: left;
+      font-size: 11px; font-weight: 700; color: var(--blue);
+      border-bottom: 1.5px solid var(--border);
+      white-space: nowrap;
+    }
+    tbody td {
+      padding: 8px 12px;
+      border-bottom: 1px solid #EDF3FA;
+      color: var(--text-main);
+      font-size: 12px;
+    }
+    tbody tr:hover td { background: var(--bg-row); }
+    tbody tr:last-child td { border-bottom: none; }
+    td.num, th.num { text-align: right !important; }
+    .plus  { color: var(--green); font-weight: 700; }
+    .minus { color: var(--red);   font-weight: 700; }
+    .zero  { color: var(--text-muted); }
+
+    /* ── PILLS ── */
+    .pill {
+      display: inline-block; font-size: 10px; padding: 2px 8px;
+      border-radius: 99px; font-weight: 700; white-space: nowrap;
+    }
+    .pill-new  { background: var(--green-bg);  color: var(--green); }
+    .pill-out  { background: var(--red-bg);    color: var(--red); }
+    .pill-up   { background: var(--bg-thead);  color: var(--blue); }
+    .pill-dn   { background: var(--amber-bg);  color: var(--amber); }
+    .pill-keep { background: #F1F5F9;          color: #64748B; }
+
+    /* ── CHART PANELS ── */
+    .chart-body { padding: 14px 16px 16px; }
+    .legend-row { display: flex; gap: 14px; margin-bottom: 10px; font-size: 10px; color: var(--text-sub); }
+    .legend-row span { display: flex; align-items: center; gap: 4px; }
+    .leg-sq { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+
+    /* ── EMPTY STATE ── */
+    .empty-hint {
+      padding: 30px 16px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* ── SCROLLBAR ── */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-logo">
+    <svg viewBox="0 0 24 24"><rect x="3" y="12" width="4" height="9"/><rect x="10" y="7" width="4" height="14"/><rect x="17" y="3" width="4" height="18"/></svg>
+  </div>
+  <div>
+    <h1>서비스 이용 월별 비교</h1>
+    <p>업체별 청소 서비스 이용 현황 분석 · 파일 제목에 부서명 포함 필수</p>
+  </div>
+</header>
+
+<main>
+
+  <!-- UPLOAD -->
+  <div class="upload-row">
+    <div id="prevDrop" class="upload-card">
+      <div class="upload-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      </div>
+      <strong>지난달 데이터</strong>
+      <div id="prevSt" class="status">클릭하거나 파일을 끌어오세요 (4개)</div>
+      <input type="file" id="prevInput" multiple style="display:none">
+    </div>
+    <div id="currDrop" class="upload-card">
+      <div class="upload-icon">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      </div>
+      <strong>이번달 데이터</strong>
+      <div id="currSt" class="status">클릭하거나 파일을 끌어오세요 (4개)</div>
+      <input type="file" id="currInput" multiple style="display:none">
+    </div>
+  </div>
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <button id="compareBtn" class="btn-primary" disabled>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+      전월 비교 분석 시작
+    </button>
+    <button id="runCurrOnlyBtn" class="btn-secondary">이번달 데이터만 보기</button>
+    <button id="clearBtn" class="btn-reset">초기화</button>
+    <span class="toolbar-note">★ 파일 제목에 부서명(종합·바닥·수거·동보행)이 포함되어 있어야 합니다</span>
+  </div>
+
+  <!-- STAT CARDS -->
+  <div class="stat-row" id="statRow" style="display:none">
+    <div class="stat-card">
+      <div class="s-label">총 업체 수</div>
+      <div class="s-num" id="sc-total">—</div>
+      <div class="s-tag" id="sc-total-t"></div>
+    </div>
+    <div class="stat-card">
+      <div class="s-label">신규 업체</div>
+      <div class="s-num" id="sc-new">—</div>
+      <div class="s-tag up" id="sc-new-t"></div>
+    </div>
+    <div class="stat-card">
+      <div class="s-label">이탈 업체</div>
+      <div class="s-num" id="sc-out">—</div>
+      <div class="s-tag dn" id="sc-out-t"></div>
+    </div>
+    <div class="stat-card">
+      <div class="s-label">서비스 확대</div>
+      <div class="s-num" id="sc-up">—</div>
+      <div class="s-tag up" id="sc-up-t"></div>
+    </div>
+  </div>
+
+  <!-- SUMMARY + COMBO -->
+  <div class="panel-row" id="tableArea" style="display:none">
+    <div class="panel">
+      <div class="panel-head">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/></svg>
+        전체 증감 요약
+      </div>
+      <div class="table-wrap"><table id="summaryTable"></table></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="8 12 12 8 16 12"/><line x1="12" y1="8" x2="12" y2="16"/></svg>
+        모든 서비스 조합별 분석
+      </div>
+      <div class="table-wrap"><table id="comboTable"></table></div>
+    </div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="panel-row" id="chartArea" style="display:none">
+    <div class="panel">
+      <div class="panel-head">
+        <svg viewBox="0 0 24 24"><rect x="3" y="12" width="4" height="9"/><rect x="10" y="7" width="4" height="14"/><rect x="17" y="3" width="4" height="18"/></svg>
+        이용 서비스 개수 비교
+      </div>
+      <div class="chart-body">
+        <div class="legend-row">
+          <span><span class="leg-sq" style="background:#9BAFC6"></span>지난달</span>
+          <span><span class="leg-sq" style="background:#3A6EA5"></span>이번달</span>
+        </div>
+        <div style="position:relative;height:220px;">
+          <canvas id="serviceCountChart" role="img" aria-label="이용 서비스 개수 비교 막대 차트">1~4개 서비스 이용 업체 수 지난달·이번달 비교</canvas>
+        </div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <svg viewBox="0 0 24 24"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>
+        업체 변동 유형
+      </div>
+      <div class="chart-body">
+        <div class="legend-row" id="changeTypeLegend"></div>
+        <div style="position:relative;height:220px;">
+          <canvas id="changeTypeChart" role="img" aria-label="업체 변동 유형 막대 차트">신규·이탈·확대·축소·유지 유형별 업체 수</canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DETAIL TABLE -->
+  <div class="panel-row" id="detailArea" style="display:none">
+    <div class="panel full">
+      <div class="panel-head">
+        <svg viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        업체별 상세 변동 내역
+      </div>
+      <div class="table-wrap"><table id="changeTable"></table></div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const services   = ['종합','바닥','수거','동보행'];
+  const fixedOrder = ['종합','바닥','수거','동보행','종합+바닥','종합+수거','종합+동보행','바닥+수거','바닥+동보행','수거+동보행','종합+바닥+수거','종합+바닥+동보행','종합+수거+동보행','바닥+수거+동보행','종합+바닥+수거+동보행'];
+  const colConfig  = { '종합':{v:7,a:5}, '바닥':{v:7,a:5}, '수거':{v:7,a:5}, '동보행':{v:8,a:6} };
+  const TYPE_COLORS = { '신규':'#2E7D32','이탈':'#C62828','확대':'#3A6EA5','축소':'#B45309','유지':'#9BAFC6' };
+
+  let prevData = null, currData = null, myCharts = {};
+
+  function getSortedCombo(set) {
+    if (!set || set.size === 0) return '이탈';
+    return services.filter(s => set.has(s)).join('+');
+  }
+
+  async function handleFiles(type, files) {
+    const map = new Map();
+    for (const f of files) {
+      const sName = services.find(s => f.name.includes(s));
+      if (!sName) continue;
+      const conf = colConfig[sName];
+      const wb   = XLSX.read(await f.arrayBuffer(), { type:'array' });
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1 });
+      rows.slice(2).forEach(r => {
+        const name = String(r[conf.v] || '').trim();
+        const addr = String(r[conf.a] || '').trim();
+        if (!name || name === '업체명') return;
+        if (!map.has(name)) map.set(name, { s: new Set(), a: new Set() });
+        map.get(name).s.add(sName);
+        if (addr) map.get(name).a.add(addr);
+      });
+    }
+    if (type === 'prev') {
+      prevData = map;
+      $('prevSt').innerHTML = `<span class="badge-ok">✓ ${map.size}개 완료</span>`;
+    } else {
+      currData = map;
+      $('currSt').innerHTML = `<span class="badge-ok">✓ ${map.size}개 완료</span>`;
+    }
+    $('compareBtn').disabled = false;
+  }
+
+  function runAnalysis() {
+    const names = Array.from(new Set([...(prevData?.keys()||[]), ...(currData?.keys()||[])]));
+    const rows  = names.map(n => {
+      const p = prevData?.get(n), c = currData?.get(n);
+      const pc = p ? p.a.size : 0, cc = c ? c.a.size : 0;
+      return {
+        업체명: n,
+        '지난달 접수건': pc,
+        '이번달 접수건': cc,
+        '증가 건수': cc - pc,
+        '이번달 이용 서비스': getSortedCombo(c?.s),
+        상태: !p ? '신규' : (!c ? '이탈' : (c.s.size > p.s.size ? '확대' : c.s.size < p.s.size ? '축소' : '유지'))
+      };
+    }).sort((a,b) => b['이번달 접수건'] - a['이번달 접수건']);
+
+    const summary = [
+      { 구분:'총 업체 수', 지난달: prevData?.size||0, 이번달: currData?.size||0, 증감: (currData?.size||0)-(prevData?.size||0) },
+      ...[1,2,3,4].map(n => ({
+        구분: `${n}개 서비스 이용`,
+        지난달: prevData ? [...prevData.values()].filter(v=>v.s.size===n).length : 0,
+        이번달: currData ? [...currData.values()].filter(v=>v.s.size===n).length : 0,
+        증감:  (currData ? [...currData.values()].filter(v=>v.s.size===n).length : 0) -
+               (prevData ? [...prevData.values()].filter(v=>v.s.size===n).length : 0)
+      })),
+      { 구분:'신규 업체', 지난달:'-', 이번달: rows.filter(r=>r.상태==='신규').length, 증감:'' },
+      { 구분:'이탈 업체', 지난달: rows.filter(r=>r.상태==='이탈').length, 이번달:'-', 증감:'' }
+    ];
+
+    const comboP={}, comboC={};
+    prevData?.forEach(v => { const c=getSortedCombo(v.s); comboP[c]=(comboP[c]||0)+1; });
+    currData?.forEach(v => { const c=getSortedCombo(v.s); comboC[c]=(comboC[c]||0)+1; });
+    const comboSummary = fixedOrder
+      .map(combo => ({ 서비스조합:combo, 지난달:comboP[combo]||0, 이번달:comboC[combo]||0, 증감:(comboC[combo]||0)-(comboP[combo]||0) }))
+      .filter(i => i.지난달>0||i.이번달>0);
+
+    renderTables(rows, summary, comboSummary);
+    renderStatCards(rows);
+    renderCharts(rows);
+    ['statRow','tableArea','chartArea','detailArea'].forEach(id => $(id).style.display = '');
+    $('detailArea').style.display = '';
+  }
+
+  /* ── RENDER TABLES ── */
+  function makeTable(id, cols, data) {
+    const thead = `<thead><tr>${cols.map(c=>`<th class="${['지난달','이번달','증감','지난달 접수건','이번달 접수건','증가 건수'].includes(c)?'num':''}">${c}</th>`).join('')}</tr></thead>`;
+    const tbody = `<tbody>${data.map(d=>`<tr>${cols.map(c=>{
+      const v = d[c];
+      if (c==='증감'||c==='증가 건수') {
+        if (v===''||v===undefined) return '<td class="num">—</td>';
+        const n = Number(v);
+        const cls = n>0?'plus':n<0?'minus':'zero';
+        return `<td class="num ${cls}">${n>0?'+':''}${v}</td>`;
+      }
+      if (c==='상태') {
+        const map={'신규':'pill-new','이탈':'pill-out','확대':'pill-up','축소':'pill-dn','유지':'pill-keep'};
+        return `<td><span class="pill ${map[v]||''}">${v}</span></td>`;
+      }
+      const isNum = ['지난달','이번달','지난달 접수건','이번달 접수건'].includes(c);
+      return `<td class="${isNum?'num':''}">${v??'—'}</td>`;
+    }).join('')}</tr>`).join('')}</tbody>`;
+    $(id).innerHTML = thead + tbody;
+  }
+
+  function renderTables(rows, summary, combo) {
+    makeTable('summaryTable', ['구분','지난달','이번달','증감'], summary);
+    makeTable('comboTable',   ['서비스조합','지난달','이번달','증감'], combo);
+    makeTable('changeTable',  ['업체명','지난달 접수건','이번달 접수건','증가 건수','이번달 이용 서비스','상태'], rows);
+  }
+
+  /* ── STAT CARDS ── */
+  function renderStatCards(rows) {
+    const total = currData?.size || 0;
+    const prevTotal = prevData?.size || 0;
+    const diff  = total - prevTotal;
+    $('sc-total').textContent = total;
+    $('sc-total-t').textContent = diff===0 ? '전월 동일' : (diff>0?`▲ ${diff} 증가`:`▼ ${Math.abs(diff)} 감소`);
+    $('sc-total-t').className = `s-tag ${diff>0?'up':diff<0?'dn':'nt'}`;
+    const newCnt = rows.filter(r=>r.상태==='신규').length;
+    const outCnt = rows.filter(r=>r.상태==='이탈').length;
+    const upCnt  = rows.filter(r=>r.상태==='확대').length;
+    $('sc-new').textContent  = newCnt;
+    $('sc-new-t').textContent= newCnt ? `이번달 신규 합류` : '해당 없음';
+    $('sc-out').textContent  = outCnt;
+    $('sc-out-t').textContent= outCnt ? `전월 대비 이탈` : '해당 없음';
+    $('sc-up').textContent   = upCnt;
+    $('sc-up-t').textContent = upCnt  ? `서비스 확대 업체` : '해당 없음';
+  }
+
+  /* ── CHARTS ── */
+  function renderCharts(rows) {
+    if (myCharts.c1) myCharts.c1.destroy();
+    if (myCharts.c2) myCharts.c2.destroy();
+
+    const getCnt = (map) => [1,2,3,4].map(n => map ? [...map.values()].filter(v=>v.s.size===n).length : 0);
+
+    const gridColor = 'rgba(58,110,165,0.07)';
+    const tickColor = '#8AAAC8';
+    const baseOpts  = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: tickColor, font: { size: 11, family: "'Noto Sans KR'" } } },
+        y: { grid: { color: gridColor }, ticks: { color: tickColor, font: { size: 10, family: "'Noto Sans KR'" } } }
+      }
+    };
+
+    myCharts.c1 = new Chart($('serviceCountChart'), {
+      type: 'bar',
+      data: {
+        labels: ['1개','2개','3개','4개'],
+        datasets: [
+          { label:'지난달', data: getCnt(prevData), backgroundColor:'#9BAFC6', borderRadius: 5 },
+          { label:'이번달', data: getCnt(currData), backgroundColor:'#3A6EA5', borderRadius: 5 }
+        ]
+      },
+      options: { ...baseOpts }
+    });
+
+    const types     = ['신규','이탈','확대','축소','유지'];
+    const typeData  = types.map(t => rows.filter(r=>r.상태===t).length);
+    const typeCols  = types.map(t => TYPE_COLORS[t]);
+
+    /* custom legend */
+    $('changeTypeLegend').innerHTML = types.map((t,i) =>
+      `<span><span class="leg-sq" style="background:${typeCols[i]}"></span>${t} ${typeData[i]}</span>`
+    ).join('');
+
+    myCharts.c2 = new Chart($('changeTypeChart'), {
+      type: 'bar',
+      data: {
+        labels: types,
+        datasets: [{ label:'업체 수', data: typeData, backgroundColor: typeCols, borderRadius: 5 }]
+      },
+      options: { ...baseOpts }
+    });
+  }
+
+  /* ── EVENT BINDING ── */
+  $('compareBtn').onclick    = runAnalysis;
+  $('runCurrOnlyBtn').onclick = () => {
+    if (!currData) return alert('이번달 파일을 먼저 업로드해주세요.');
+    const tmp = prevData; prevData = null; runAnalysis(); prevData = tmp;
+  };
+  $('clearBtn').onclick = () => location.reload();
+
+  [$('prevDrop'), $('currDrop')].forEach((drop, i) => {
+    const type  = i === 0 ? 'prev' : 'curr';
+    const input = i === 0 ? $('prevInput') : $('currInput');
+    drop.onclick = () => input.click();
+    drop.addEventListener('dragover',  e => { e.preventDefault(); drop.style.borderColor = '#3A6EA5'; });
+    drop.addEventListener('dragleave', () => { drop.style.borderColor = ''; });
+    drop.addEventListener('drop', e => { e.preventDefault(); drop.style.borderColor = ''; handleFiles(type, e.dataTransfer.files); });
+    input.addEventListener('change', e => handleFiles(type, e.target.files));
+  });
+</script>
+</body>
+</html>

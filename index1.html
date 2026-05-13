@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>서비스 이용 월별 비교 (슈퍼 레인보우 버전)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: "Malgun Gothic", "Apple SD Gothic Neo", Arial, sans-serif; font-size: 14px; color: #222; background: #f3f6f9; }
+    
+    header { 
+      padding: 22px 28px 14px; 
+      background: #fff; 
+      border-bottom: 4px solid;
+      border-image: linear-gradient(to right, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #8b00ff) 1;
+    }
+    
+    main { padding: 22px 28px 36px; }
+    .drops { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+    .drop { display: grid; place-items: center; min-height: 120px; padding: 24px; background: #fff; border: 2px dashed #aaa; border-radius: 8px; text-align: center; cursor: pointer; transition: 0.3s; }
+    .drop:hover { border-color: #ff7f00; background: #fffdf5; }
+    
+    .toolbar { display: flex; gap: 12px; margin: 14px 0 18px; flex-wrap: wrap; align-items: center; }
+    
+    /* [메인 버튼] 강렬한 무지개 그라데이션 */
+    button.main { 
+      background: linear-gradient(45deg, #ff0000, #ff7f00, #008000, #0000ff);
+      background-size: 200% 200%;
+      color: #fff; 
+      border: none;
+      box-shadow: 0 4px 10px rgba(255, 0, 0, 0.2);
+    }
+    
+    /* [이번달 데이터만 보기 버튼] 화려한 네온 스타일 */
+    #runCurrOnlyBtn {
+      background: linear-gradient(45deg, #00dbde, #fc00ff);
+      background-size: 200% 200%;
+      color: #fff;
+      border: none;
+      box-shadow: 0 4px 10px rgba(0, 219, 222, 0.3);
+    }
+
+    button.main, #runCurrOnlyBtn {
+      height: 38px;
+      padding: 0 18px;
+      border-radius: 20px;
+      font-size: 14px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+    }
+
+    button.main:hover, #runCurrOnlyBtn:hover {
+      transform: translateY(-2px) scale(1.05);
+      background-position: right center;
+      box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+    }
+
+    button.main:disabled { background: #ccc; transform: none; box-shadow: none; cursor: not-allowed; }
+
+    #clearBtn { height: 38px; padding: 0 15px; border: 1px solid #ddd; border-radius: 20px; background: #fff; font-weight: bold; cursor: pointer; }
+
+    .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    section { background: #fff; padding: 20px; border-radius: 12px; border: 1px solid #ddd; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+    section h2 { margin-top: 0; font-size: 16px; color: #333; border-bottom: 2px solid #f3f6f9; padding-bottom: 10px; margin-bottom: 15px; }
+    
+    .table-wrap { overflow: auto; max-height: 500px; border: 1px solid #eee; border-radius: 8px; }
+    table { width: 100%; border-collapse: collapse; }
+    th { position: sticky; top: 0; background: #fdfdfd; z-index: 10; border-bottom: 3px solid #ff7f00; padding: 12px; }
+    td { padding: 10px 12px; border-bottom: 1px solid #eee; border-right: 1px solid #eee; text-align: center !important; }
+    td:last-child { border-right: none; }
+
+    /* [업체별 상세 변동 내역] 가로 크기 30% 확장 설정 */
+    .full { grid-column: 1 / -1; }
+    #changeTable { 
+      min-width: 130%; /* 기존 대비 30% 확장 */
+      width: 130%;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>서비스 이용 월별 비교(지극히 테스트버전)</h1>
+    <p>With.코덱스,클로이드,지피티,제미나이.. 땡큐</p>
+  </header>
+
+  <main>
+    <div class="drops">
+      <div id="prevDrop" class="drop"><strong>지난달꺼 (4개 파일)</strong><div id="prevSt" class="status">클릭하던가 끌어오든가</div><input type="file" id="prevInput" multiple style="display:none"></div>
+      <div id="currDrop" class="drop"><strong>이번달꺼 (4개 파일)</strong><div id="currSt" class="status">클릭하던가 끌어오든가</div><input type="file" id="currInput" multiple style="display:none"></div>
+    </div>
+    <p>★첨부 파일 제목에 부서 이름 들어가있어야함★</p>
+
+
+    <div class="toolbar">
+      <button id="compareBtn" class="main" disabled>전월 비교 분석 시작 🌈</button>
+      <button id="runCurrOnlyBtn">이번달 데이터만 보기 ✨</button>
+      <button id="clearBtn">초기화</button>
+    </div>
+
+    <div class="panels">
+      <section><h2>전체 증감 요약</h2><div class="table-wrap"><table id="summaryTable"></table></div></section>
+      <section><h2>모든 서비스 조합별 분석</h2><div class="table-wrap"><table id="comboTable"></table></div></section>
+    </div>
+
+    <div id="chartArea" class="panels" style="display:none; margin-top:20px;">
+      <section>
+        <h2>이용 서비스 개수 비교</h2>
+        <div style="height:300px;"><canvas id="serviceCountChart"></canvas></div>
+      </section>
+      <section>
+        <h2>업체 변동 유형</h2>
+        <div style="height:300px;"><canvas id="changeTypeChart"></canvas></div>
+      </section>
+    </div>
+
+    <div class="panels" style="margin-top:20px;">
+      <section class="full"><h2>업체별 상세 변동 내역</h2><div class="table-wrap"><table id="changeTable"></table></div></section>
+    </div>
+  </main>
+
+  <script>
+    const el = id => document.getElementById(id);
+    const services = ["종합", "바닥", "수거", "동보행"];
+    const fixedOrder = ["종합", "바닥", "수거", "동보행", "종합+바닥", "종합+수거", "종합+동보행", "바닥+수거", "바닥+동보행", "수거+동보행", "종합+바닥+수거", "종합+바닥+동보행", "종합+수거+동보행", "바닥+수거+동보행", "종합+바닥+수거+동보행"];
+    const colConfig = { "종합": {v:7, a:5}, "바닥": {v:7, a:5}, "수거": {v:7, a:5}, "동보행": {v:8, a:6} };
+    
+    let previousData = null, currentData = null, comparison = null, myCharts = {};
+
+    function getSortedCombo(set) {
+      if(!set || set.size === 0) return "이탈";
+      return services.filter(s => set.has(s)).join("+");
+    }
+
+    async function handleFiles(type, files) {
+      const vendorMap = new Map();
+      for (const f of files) {
+        const sName = services.find(s => f.name.includes(s));
+        if (!sName) continue;
+        const conf = colConfig[sName];
+        const wb = XLSX.read(await f.arrayBuffer(), {type: 'array'});
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header: 1});
+        rows.slice(2).forEach(r => {
+          const name = String(r[conf.v] || "").trim();
+          const addr = String(r[conf.a] || "").trim();
+          if (!name || name === "업체명") return;
+          if (!vendorMap.has(name)) vendorMap.set(name, { s: new Set(), a: new Set() });
+          vendorMap.get(name).s.add(sName);
+          if (addr) vendorMap.get(name).a.add(addr);
+        });
+      }
+      if (type === "prev") { previousData = vendorMap; el("prevSt").innerText = vendorMap.size + "개 완료"; }
+      else { currentData = vendorMap; el("currSt").innerText = vendorMap.size + "개 완료"; }
+      el("compareBtn").disabled = !(previousData || currentData);
+    }
+
+    const runAnalysis = () => {
+      const names = Array.from(new Set([...(previousData?.keys()||[]), ...(currentData?.keys()||[])]));
+      const rows = names.map(n => {
+        const p = previousData?.get(n), c = currentData?.get(n);
+        const pc = p ? p.a.size : 0, cc = c ? c.a.size : 0;
+        return {
+          업체명: n, "지난달 접수건": pc, "이번달 접수건": cc, "증가 건수": cc - pc,
+          "이번달 이용 서비스": getSortedCombo(c?.s),
+          상태: !p ? "신규" : (!c ? "이탈" : (c.s.size > p.s.size ? "확대" : (c.s.size < p.s.size ? "축소" : "유지")))
+        };
+      }).sort((a, b) => b["이번달 접수건"] - a["이번달 접수건"]);
+
+      const summary = [
+        { 구분: "총 업체수", 지난달: previousData?.size||0, 이번달: currentData?.size||0, 증감: (currentData?.size||0)-(previousData?.size||0) },
+        ...[1, 2, 3, 4].map(n => ({
+          구분: `${n}개 서비스 이용`,
+          지난달: previousData ? Array.from(previousData.values()).filter(v => v.s.size === n).length : 0,
+          이번달: currentData ? Array.from(currentData.values()).filter(v => v.s.size === n).length : 0,
+          증감: (currentData ? Array.from(currentData.values()).filter(v => v.s.size === n).length : 0) - (previousData ? Array.from(previousData.values()).filter(v => v.s.size === n).length : 0)
+        })),
+        { 구분: "신규 업체", 지난달: "-", 이번달: rows.filter(r => r.상태 === "신규").length, 증감: "" },
+        { 구분: "이탈 업체", 지난달: rows.filter(r => r.상태 === "이탈").length, 이번달: "-", 증감: "" }
+      ];
+
+      const comboMapPrev = {}, comboMapCurr = {};
+      if(previousData) previousData.forEach(v => { const c = getSortedCombo(v.s); comboMapPrev[c] = (comboMapPrev[c]||0)+1; });
+      if(currentData) currentData.forEach(v => { const c = getSortedCombo(v.s); comboMapCurr[c] = (comboMapCurr[c]||0)+1; });
+      
+      const comboSummary = fixedOrder.map(combo => {
+        const pVal = comboMapPrev[combo] || 0, cVal = comboMapCurr[combo] || 0;
+        return { 서비스조합: combo, 지난달: pVal, 이번달: cVal, 증감: cVal - pVal };
+      }).filter(item => item.지난달 > 0 || item.이번달 > 0);
+
+      comparison = { rows, summary, comboSummary };
+      renderAll();
+    };
+
+    function renderAll() {
+      const draw = (id, cols, data) => {
+        el(id).innerHTML = `<thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>${data.map(d=>`<tr>${cols.map(c=>`<td>${d[c]}</td>`).join('')}</tr>`).join('')}</tbody>`;
+      };
+      draw("summaryTable", ["구분", "지난달", "이번달", "증감"], comparison.summary);
+      draw("comboTable", ["서비스조합", "지난달", "이번달", "증감"], comparison.comboSummary);
+      draw("changeTable", ["업체명", "지난달 접수건", "이번달 접수건", "증가 건수", "이번달 이용 서비스", "상태"], comparison.rows);
+      updateCharts();
+      el('chartArea').style.display = 'grid';
+    }
+
+    function updateCharts() {
+      if(myCharts.c1) myCharts.c1.destroy(); if(myCharts.c2) myCharts.c2.destroy();
+      const getSvcCnt = (map) => (map && map.size > 0) ? [1,2,3,4].map(n => Array.from(map.values()).filter(v => v.s.size === n).length) : [0,0,0,0];
+      const rainbow = ['#ff4d4d', '#ffa64d', '#ffff4d', '#4dff4d', '#4d4dff', '#a64dff'];
+
+      myCharts.c1 = new Chart(el('serviceCountChart'), {
+        type: 'bar',
+        data: {
+          labels: ['1개', '2개', '3개', '4개'],
+          datasets: [{ label: '지난달', data: getSvcCnt(previousData), backgroundColor: '#eee' }, { label: '이번달', data: getSvcCnt(currentData), backgroundColor: rainbow }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+
+      const tps = ["신규", "이탈", "확대", "축소", "유지"];
+      myCharts.c2 = new Chart(el('changeTypeChart'), {
+        type: 'bar',
+        data: {
+          labels: tps,
+          datasets: [{ label: '업체 수', data: tps.map(t => comparison.rows.filter(r => r.상태 === t).length), backgroundColor: ['#ff9aa2', '#ffb7b2', '#ffdac1', '#e2f0cb', '#b5ead7'] }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+    }
+
+    el("compareBtn").onclick = runAnalysis;
+    el("runCurrOnlyBtn").onclick = () => {
+      if(!currentData) return alert("이번달 파일을 먼저 넣어주세요.");
+      const tempPrev = previousData; previousData = null; runAnalysis(); previousData = tempPrev;
+    };
+
+    [el("prevDrop"), el("currDrop")].forEach((d, i) => {
+      const type = i === 0 ? "prev" : "curr";
+      const input = i === 0 ? (el("prevInput")) : (el("currInput"));
+      d.onclick = () => input.click();
+      d.addEventListener("dragover", e => { e.preventDefault(); d.style.borderColor = "orange"; });
+      d.addEventListener("dragleave", () => d.style.borderColor = "#aaa");
+      d.addEventListener("drop", e => { e.preventDefault(); d.style.borderColor = "#aaa"; handleFiles(type, e.dataTransfer.files); });
+      input.addEventListener("change", e => handleFiles(type, e.target.files));
+    });
+    el("clearBtn").onclick = () => location.reload();
+  </script>
+</body>
+</html>
